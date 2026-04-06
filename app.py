@@ -151,7 +151,7 @@ def gerar():
     return send_file(
         buffer, 
         as_attachment=True, 
-        download_name=f"recibo_{numero}.pdf", 
+        download_name=f"recibo_{nome_cliente}.pdf", 
         mimetype='application/pdf'
     )
 
