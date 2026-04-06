@@ -12,7 +12,7 @@
     </style>
 </head>
 <body>
-    <div class="container mt-5">
+    <div class="container mt-5 mb-5">
         <div class="row justify-content-center">
             <div class="col-md-8 col-lg-6">
                 
@@ -41,7 +41,7 @@
 
                         <div class="mb-3">
                             <label class="form-label">CPF ou CNPJ (Apenas números)</label>
-                            <input type="text" name="cpf_cnpj" class="form-control" placeholder="12345678902">
+                            <input type="text" name="cpf_cnpj" class="form-control" placeholder="Ex: 12345678902">
                         </div>
 
                         <div class="mb-3">
@@ -54,14 +54,93 @@
                             <input type="text" name="motivo" class="form-control" required placeholder="Ex: Aluguel de Tendas">
                         </div>
 
-                        <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
-                            GERAR E BAIXAR PDF
-                        </button>
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-outline-primary py-2 fw-bold">
+                                ⬇️ APENAS BAIXAR PDF
+                            </button>
+                            
+                            <button type="button" id="btn-share" class="btn btn-success py-2 fw-bold" onclick="compartilharPDF(event)">
+                                📲 ENVIAR PELO WHATSAPP
+                            </button>
+                        </div>
                     </form>
                 </div>
 
             </div>
         </div>
     </div>
+
+    <script>
+        async function compartilharPDF(event) {
+            event.preventDefault();
+            const form = document.querySelector('form');
+            
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const formData = new FormData(form);
+            const btn = document.getElementById('btn-share');
+            const textoOriginal = btn.innerHTML;
+
+            try {
+                btn.innerHTML = "⏳ GERANDO ARQUIVO...";
+                btn.disabled = true;
+
+                const response = await fetch('/gerar', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) throw new Error('Falha ao gerar o recibo');
+
+                const blob = await response.blob();
+                const numero = formData.get('numero');
+                const cliente = formData.get('nome_cliente');
+                const valor = formData.get('valor');
+                const nomeArquivo = `recibo_loctendas_${numero}.pdf`;
+                const file = new File([blob], nomeArquivo, { type: 'application/pdf' });
+
+                // TENTA MODO CELULAR (Compartilhamento nativo)
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        title: 'Recibo Loc Tendas',
+                        text: `Segue o recibo nº ${numero} da Loc Tendas.`,
+                        files: [file]
+                    });
+                } 
+                // MODO COMPUTADOR (WhatsApp Web)
+                else {
+                    // 1. Faz o download do arquivo primeiro
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = nomeArquivo;
+                    a.click();
+
+                    // 2. Pede o número do cliente
+                    let telefone = prompt("Para enviar via WhatsApp Web, digite o número do cliente:\n(Com DDD, apenas números. Ex: 63999999999)\n\nO PDF já foi baixado nas suas Transferências.");
+
+                    if (telefone) {
+                        // 3. Monta a mensagem e abre o Zap
+                        let texto = `Olá, ${cliente}! Tudo bem?\nSegue em anexo o seu recibo Nº ${numero} no valor de R$ ${valor}.\n\n*Loc Tendas*`;
+                        let waUrl = `https://wa.me/55${telefone}?text=${encodeURIComponent(texto)}`;
+                        
+                        setTimeout(() => {
+                            window.open(waUrl, '_blank');
+                        }, 500);
+                    }
+                }
+
+            } catch (error) {
+                console.error(error);
+                alert("Ocorreu um erro ao gerar o arquivo.");
+            } finally {
+                btn.innerHTML = textoOriginal;
+                btn.disabled = false;
+            }
+        }
+    </script>
 </body>
 </html>
